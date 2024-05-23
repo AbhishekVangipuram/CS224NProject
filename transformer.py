@@ -8,6 +8,8 @@ import math
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"]
 UNK_IDX, CLS_IDX, SEP_IDX, PAD_IDX, MASK_IDX = 0, 1, 2, 3, 4
+BOS_IDX = CLS_IDX
+EOS_IDX = SEP_IDX
 
 # helper Module that adds positional encoding to the token embedding to introduce a notion of word order.
 class PositionalEncoding(nn.Module):
