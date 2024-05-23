@@ -12,15 +12,6 @@ dataset = load_dataset("csv", data_files="data/v3.csv")
 data_splits = dataset['train'].train_test_split(0.1)
 train, test = data_splits['train'], data_splits['test']
 
-# metrics for later
-chrf = load('chrf')
-gleu = load('google_bleu')
-rouge = load('rouge') 
-bleu = load('bleu')
-meteor = load('meteor')
-metrics = combine([chrf, bleu, rouge, meteor, gleu])
-
-
 obolo_tokenizer = PreTrainedTokenizerFast(tokenizer_file='data/obolo-bpe-tokenizer.json')
 english_tokenizer = AutoTokenizer.from_pretrained('gpt2')
 
@@ -51,3 +42,13 @@ transformer = transformer.to(DEVICE)
 loss_fn = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX)
 
 optimizer = torch.optim.Adam(transformer.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+
+
+
+# metrics
+chrf = load('chrf')
+gleu = load('google_bleu')
+rouge = load('rouge') 
+bleu = load('bleu')
+meteor = load('meteor')
+metrics = combine([chrf, bleu, rouge, meteor, gleu])
