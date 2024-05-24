@@ -5,19 +5,39 @@ from transformers import PreTrainedTokenizerFast, AutoTokenizer
 from datasets import load_dataset
 from evaluate import load, combine
 from transformer import *
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
+from numba import cuda
+device = cuda.get_current_device()
+device.reset() 
 
+SRC_LANGUAGE = 'ob'
+TGT_LANGUAGE = 'en'
 
 # get data 
 train = load_dataset('csv', data_files='data/train.csv')['train']
 test = load_dataset('csv', data_files='data/test.csv')['train']
+val = test[:200] # random choice for val loss
 
-obolo_tokenizer = PreTrainedTokenizerFast(tokenizer_file='data/obolo-bpe-tokenizer.json')
-english_tokenizer = AutoTokenizer.from_pretrained('gpt2')
+obolo_tokenizer = PreTrainedTokenizerFast(tokenizer_file='data/obolo-bpe-tokenizer.json', padding='left')
+english_tokenizer = AutoTokenizer.from_pretrained('gpt2', padding='left')
 
 print(obolo_tokenizer.vocab_size)
 print(english_tokenizer.vocab_size)
+print(DEVICE)
+# Place-holders
+token_transform = {}
+vocab_transform = {}
+
+token_transform[SRC_LANGUAGE] = obolo_tokenizer
+token_transform[TGT_LANGUAGE] = english_tokenizer
+
+vocab_transform[SRC_LANGUAGE] = obolo_tokenizer.vocab 
+vocab_transform[TGT_LANGUAGE] = english_tokenizer.vocab
+# for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
+#   vocab_transform[ln].set_default_index(UNK_IDX)
+
+
 # now this BPE tokenizer is also equipped with a decoder, so we should be able to do Obolo -> English and English -> Obolo
 
 torch.manual_seed(0)
@@ -30,6 +50,7 @@ FFN_HID_DIM = 512
 BATCH_SIZE = 128
 NUM_ENCODER_LAYERS = 3
 NUM_DECODER_LAYERS = 3
+
 
 transformer = Seq2SeqTransformer(NUM_ENCODER_LAYERS, NUM_DECODER_LAYERS, EMB_SIZE,
                                  NHEAD, SRC_VOCAB_SIZE, TGT_VOCAB_SIZE, FFN_HID_DIM)
@@ -56,18 +77,17 @@ def sequential_transforms(*transforms):
     return func
 
 # function to add BOS/EOS and create tensor for input sequence indices
-def tensor_transform(token_ids: List[int]):
+def tensor_transform(token_ids: list[int]):
     return torch.cat((torch.tensor([BOS_IDX]),
                       torch.tensor(token_ids),
                       torch.tensor([EOS_IDX])))
 
 # ``src`` and ``tgt`` language text transforms to convert raw strings into tensors indices
 text_transform = {}
-for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
-    text_transform[ln] = sequential_transforms(token_transform[ln], #Tokenization
-                                               vocab_transform[ln], #Numericalization
-                                               tensor_transform) # Add BOS/EOS and create tensor
-
+text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: token_transform[SRC_LANGUAGE](text).get('input_ids')), # input to tokens to ids
+                                                     tensor_transform)                                                    # add BOS/EOS and create tensor
+text_transform[TGT_LANGUAGE] = sequential_transforms((lambda text: token_transform[TGT_LANGUAGE](text).get('input_ids')),
+                                                     tensor_transform)    
 
 # function to collate data samples into batch tensors
 def collate_fn(batch):
@@ -81,11 +101,28 @@ def collate_fn(batch):
     return src_batch, tgt_batch
 
 
+class TextDataset(Dataset):
+    def __init__(self, src_list, tgt_list):
+        self.src = src_list
+        self.tgt = tgt_list
+        self.pairs = list(zip(self.src, self.tgt))
+    def __len__(self):
+        return len(self.pairs)
+        
+    def __getitem__(self, idx):
+        return self.pairs[idx]
+
+train_dict = TextDataset(train['Obolo'], train['English'])
+train_dataloader = DataLoader(train_dict, batch_size=BATCH_SIZE, collate_fn=collate_fn)
+val_dict = TextDataset(val['Obolo'], val['English'])
+val_dataloader = DataLoader(val_dict, batch_size=BATCH_SIZE, collate_fn=collate_fn)
+test_dict = TextDataset(test['Obolo'], test['English'])
+test_dataloader = DataLoader(test_dict, batch_size=BATCH_SIZE, collate_fn=collate_fn)
+
+
 def train_epoch(model, optimizer):
     model.train()
     losses = 0
-    train_iter = Multi30k(split='train', language_pair=(SRC_LANGUAGE, TGT_LANGUAGE))
-    train_dataloader = DataLoader(train_iter, batch_size=BATCH_SIZE, collate_fn=collate_fn)
 
     for src, tgt in train_dataloader:
         src = src.to(DEVICE)
@@ -113,9 +150,6 @@ def evaluate(model):
     model.eval()
     losses = 0
 
-    val_iter = Multi30k(split='valid', language_pair=(SRC_LANGUAGE, TGT_LANGUAGE))
-    val_dataloader = DataLoader(val_iter, batch_size=BATCH_SIZE, collate_fn=collate_fn)
-
     for src, tgt in val_dataloader:
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
@@ -135,9 +169,11 @@ def evaluate(model):
 
 
 from timeit import default_timer as timer
-NUM_EPOCHS = 18
+from tqdm import tqdm
 
-for epoch in range(1, NUM_EPOCHS+1):
+NUM_EPOCHS = 2
+
+for epoch in tqdm(range(1, NUM_EPOCHS+1)):
     start_time = timer()
     train_loss = train_epoch(transformer, optimizer)
     end_time = timer()
@@ -177,8 +213,9 @@ def translate(model: torch.nn.Module, src_sentence: str):
     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
     tgt_tokens = greedy_decode(
         model,  src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX).flatten()
-    return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
-
+    
+    # return " ".join(vocab_transform[TGT_LANGUAGE].lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("[CLS]", "").replace("[SEP]", "")
+    return token_transform[TGT_LANGUAGE].batch_decode(tgt_tokens)
 
 
 # metrics
