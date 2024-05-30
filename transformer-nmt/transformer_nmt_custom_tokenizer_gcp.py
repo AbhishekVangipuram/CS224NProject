@@ -57,11 +57,8 @@ vocab_transform[TGT_LANGUAGE] = english_tokenizer.vocab
 
 # change this due to custom tokenizer
 # init_text_transform(token_transform)
-# text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: [obolo_vocab[token] if token in obolo_vocab else UNK_IDX for token in token_transform[SRC_LANGUAGE](text)]), # input to tokens to ids
-                                                    #  tensor_transform)                                                                                                          # add BOS/EOS and create tensor
-
-text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: [obolo_vocab[token] for token in token_transform[SRC_LANGUAGE](text)]), # input to tokens to ids
-                                                     tensor_transform)                                                                     # add BOS/EOS and create tensor
+text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: [obolo_vocab[token] if token in obolo_vocab else UNK_IDX for token in token_transform[SRC_LANGUAGE](text)]), # input to tokens to ids
+                                                     tensor_transform)                                                                                                          # add BOS/EOS and create tensor
                                                                    
 text_transform[TGT_LANGUAGE] = sequential_transforms((lambda text: token_transform[TGT_LANGUAGE](text).get('input_ids')),
                                                      tensor_transform)    
