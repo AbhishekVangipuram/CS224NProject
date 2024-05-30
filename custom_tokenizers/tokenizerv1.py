@@ -150,8 +150,8 @@ def shitparse(word):
     parse += tail
     if len(parse) > 1:
         raw_verbdict.add(original)
-    if len(parse) > 6:
-        print(parse)
+    # if len(parse) > 6:
+        # print(parse)
     for token in parse:
         worddict.add(token)
     return parse

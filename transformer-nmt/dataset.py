@@ -36,7 +36,7 @@ def tensor_transform(token_ids: list[int]):
 # ``src`` and ``tgt`` language text transforms to convert raw strings into tensors indices
 text_transform = {}
 
-def init_text_transform(token_transform, vocab_transform):
+def init_text_transform(token_transform):
     text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: token_transform[SRC_LANGUAGE](text).get('input_ids')), # input to tokens to ids
                                                          tensor_transform)                                                    # add BOS/EOS and create tensor
     text_transform[TGT_LANGUAGE] = sequential_transforms((lambda text: token_transform[TGT_LANGUAGE](text).get('input_ids')),
