@@ -180,3 +180,29 @@ def parse_sentence(s):
 # also like in like isisi the first si could be reduplicative or the prefix as well... this one is genuinely ambiguous
 # for now do not take tone as a morpheme, try to be smart about working around it
 # remember that the real tryhard thing is to try to decompose morphemes, i.e., to analyze ma as 1SG, FUT
+
+import torch
+
+class CustomOboloTokenizer:
+    def __init__(self, string_to_list_tokens, vocab, unk_token_id, pad_token_id):
+        self.string_to_list_tokens = string_to_list_tokens  # e.g. parse_sentence
+        self.vocab = vocab                                  # e.g. obolo_vocab
+        self.unk_token_id = unk_token_id
+        self.pad_token_id = pad_token_id
+        self.device = 'cpu'
+    
+    def to(self, device):
+        self.device = device
+
+    def __call__(self, str, return_tensors=None):
+        token_list = self.string_to_list_tokens(str)
+        id_list = [(self.vocab[token] if token in self.vocab else self.unk_token_id) for token in token_list]
+        attention_mask = [1 for _ in range(len(id_list))]
+        if return_tensors == "pt":
+            id_list = torch.tensor(id_list).to(self.device)
+            attention_mask = torch.tensor(attention_mask).to(self.device)
+        return {'input_ids': id_list,
+                'attention_mask': attention_mask}
+        
+    def decode(self, ids, skip_special_tokens=True):
+        return " ".join([self.vocab[id] for id in ids if id >= (3 if skip_special_tokens else 0)])

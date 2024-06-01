@@ -106,7 +106,7 @@ def train_epoch(model, optimizer):
     for src, tgt in tqdm(train_dataloader):
         src = src.to(DEVICE)
         tgt = tgt.to(DEVICE)
-
+        
         tgt_input = tgt[:-1, :]
 
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
