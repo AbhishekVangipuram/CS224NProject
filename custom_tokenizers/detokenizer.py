@@ -5,26 +5,26 @@ tones = ['̀', '̂']
 vowels = 'aeiouọ'
 consonants = "fknrmbwjsyltgpdch"
 
-with open('nv_tokens.txt', 'r') as file:
-    nv_tokens_txt = file.readlines()
-nv_tokens = set()
-for line in nv_tokens_txt:
-    nv_tokens.add(line.strip())
-with open('ManualVerbList.txt', 'r') as file:
-    canonical_verbs_txt = file.readlines()
-canonical_verbs = set()
-for line in canonical_verbs_txt:
-    canonical_verbs.add(line.strip())
-with open('affixlist.txt', 'r') as file:
-    affixlist_txt = file.readlines()
-affixlist = set()
-for line in affixlist_txt:
-    affixlist.add(line.strip())
+# with open('nv_tokens.txt', 'r') as file:
+#     nv_tokens_txt = file.readlines()
+# nv_tokens = set()
+# for line in nv_tokens_txt:
+#     nv_tokens.add(line.strip())
+# with open('ManualVerbList.txt', 'r') as file:
+#     canonical_verbs_txt = file.readlines()
+# canonical_verbs = set()
+# for line in canonical_verbs_txt:
+#     canonical_verbs.add(line.strip())
+# with open('affixlist.txt', 'r') as file:
+#     affixlist_txt = file.readlines()
+# affixlist = set()
+# for line in affixlist_txt:
+#     affixlist.add(line.strip())
 
-all_tokens = set()
-all_tokens = all_tokens.union(nv_tokens)
-all_tokens = all_tokens.union(canonical_verbs)
-all_tokens = all_tokens.union(affixlist)
+# all_tokens = set()
+# all_tokens = all_tokens.union(nv_tokens)
+# all_tokens = all_tokens.union(canonical_verbs)
+# all_tokens = all_tokens.union(affixlist)
 
 def is_prefix(token):
     return len(token) > 1 and token[-1] == '-'
