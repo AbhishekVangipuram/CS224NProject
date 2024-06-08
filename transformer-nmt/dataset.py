@@ -3,8 +3,8 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 
 
-SRC_LANGUAGE = 'ob'
-TGT_LANGUAGE = 'en'
+SRC_LANGUAGE = None
+TGT_LANGUAGE = None
 
 # dataset config for our texts
 class TextDataset(Dataset):
@@ -36,7 +36,12 @@ def tensor_transform(token_ids: list[int]):
 # ``src`` and ``tgt`` language text transforms to convert raw strings into tensors indices
 text_transform = {}
 
-def init_text_transform(token_transform):
+def init_text_transform(token_transform, src_lang='ob', tgt_lang='en'):
+    global SRC_LANGUAGE
+    global TGT_LANGUAGE
+    SRC_LANGUAGE = src_lang
+    TGT_LANGUAGE = tgt_lang
+    print(SRC_LANGUAGE, TGT_LANGUAGE)
     text_transform[SRC_LANGUAGE] = sequential_transforms((lambda text: token_transform[SRC_LANGUAGE](text).get('input_ids')), # input to tokens to ids
                                                          tensor_transform)                                                    # add BOS/EOS and create tensor
     text_transform[TGT_LANGUAGE] = sequential_transforms((lambda text: token_transform[TGT_LANGUAGE](text).get('input_ids')),
