@@ -182,27 +182,93 @@ def parse_sentence(s):
 # remember that the real tryhard thing is to try to decompose morphemes, i.e., to analyze ma as 1SG, FUT
 
 import torch
+from transformers import T5Tokenizer
+from transformers import PreTrainedTokenizer
 
-class CustomOboloTokenizer:
-    def __init__(self, string_to_list_tokens, vocab, unk_token_id, pad_token_id):
+class CustomOboloTokenizer(PreTrainedTokenizer):
+    def __init__(self, string_to_list_tokens, vocab, unk_token_id, pad_token_id, **kwargs):
         self.string_to_list_tokens = string_to_list_tokens  # e.g. parse_sentence
         self.vocab = vocab                                  # e.g. obolo_vocab
-        self.unk_token_id = unk_token_id
-        self.pad_token_id = pad_token_id
+        self.reverse_vocab = {self.vocab[token]: token for token in self.vocab} # reverse
+        self._unk_token_id = unk_token_id
         self.device = 'cpu'
+        super().__init__(**kwargs)
+        self.pad_token = '<pad>'
+        self.pad_token_id = pad_token_id
     
     def to(self, device):
         self.device = device
+        
+    def get_vocab(self):
+        return self.vocab
 
-    def __call__(self, str, return_tensors=None):
-        token_list = self.string_to_list_tokens(str)
-        id_list = [(self.vocab[token] if token in self.vocab else self.unk_token_id) for token in token_list]
-        attention_mask = [1 for _ in range(len(id_list))]
-        if return_tensors == "pt":
-            id_list = torch.tensor(id_list).to(self.device)
-            attention_mask = torch.tensor(attention_mask).to(self.device)
-        return {'input_ids': id_list,
-                'attention_mask': attention_mask}
+    def _convert_id_to_token(self, ids):
+        return self.reverse_vocab[ids]
+    
+    def _convert_token_to_id(self, token):
+        return self.vocab[token] if token in self.vocab else self._unk_token_id
+
+    def __call__(self, s, return_tensors=None, max_length=None, truncation=False):
+        if isinstance(s, list):
+            tokens = [self.string_to_list_tokens(x) for x in s]
+            ids = [[(self.vocab[token] if token in self.vocab else self._unk_token_id) for token in token_list] for token_list in tokens]
+            if return_tensors == "pt":
+                ids = torch.tensor(ids).to(self.device)
+                attention_mask = torch.ones_like(ids)
+                if isinstance(max_length, int) and truncation:
+                    ids = ids[..., :max_length]
+                    attention_mask = attention_mask[..., :max_length]
+            else:
+                attention_mask = [[1 for _ in range(len(ids[0]))] for __ in range(len(ids))]
+                if isinstance(max_length, int) and truncation:
+                    ids = [id[:max_length] for id in ids]
+                    attention_mask = [att[:max_length] for att in attention_mask]
+            id_list = ids
+            
+        else:
+            token_list = self.string_to_list_tokens(s)
+            id_list = [(self.vocab[token] if token in self.vocab else self._unk_token_id) for token in token_list]
+            attention_mask = [1 for _ in range(len(id_list))]
+            if return_tensors == "pt":
+                id_list = torch.tensor(id_list).to(self.device)
+                attention_mask = torch.tensor(attention_mask).to(self.device)
+            if isinstance(max_length, int) and truncation:
+                id_list = id_list[:max_length]
+                attention_mask = attention_mask[:max_length]
+        return {'input_ids': id_list}
+                #'attention_mask': attention_mask}
         
     def decode(self, ids, skip_special_tokens=True):
         return " ".join([self.vocab[id] for id in ids if id >= (3 if skip_special_tokens else 0)])
+    
+    def save_pretrained(self, output_dir):
+        pass
+
+# class CustomTokenizer(PreTrainedTokenizer):
+#     def __init__(self, vocab_file, **kwargs):
+#         super().__init__(**kwargs)
+#         self.vocab = self.load_vocab(vocab_file)
+#         self.vocab_file = vocab_file
+
+#     def load_vocab(self, vocab_file):
+#         # Load your vocabulary from file
+#         vocab = {}
+#         with open(vocab_file, 'r', encoding='utf-8') as file:
+#             for index, token in enumerate(file.readlines()):
+#                 vocab[token.strip()] = index
+#         return vocab
+
+#     def _tokenize(self, text):
+#         # Implement your tokenization logic
+#         tokens = text.split()  # Simple whitespace tokenizer
+#         return tokens
+
+#     def _convert_token_to_id(self, token):
+#         # Convert a token string to an id
+#         return self.vocab.get(token, self.vocab.get("[UNK]"))
+
+#     def _convert_id_to_token(self, index):
+#         # Convert an id to a token string
+#         return {v: k for k, v in self.vocab.items()}.get(index, "[UNK]")
+
+#     # Implement other necessary methods based on your requirements
